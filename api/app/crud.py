@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from typing import Any
-from sqlalchemy import text
+from sqlalchemy import text, bindparam
 from sqlalchemy.engine import Engine
+from sqlalchemy.dialects.postgresql import JSONB
 
 """
 Insert a single tweet into the database and return its generated ID.
@@ -31,7 +32,7 @@ def insert_tweet(engine: Engine, *, query: str, text_content: str, created_at: A
         INSERT INTO tweets (query, text, created_at, raw_json)
         VALUES (:query, :text, :created_at, :raw_json)
         RETURNING id;
-    """)
+    """).bindparams(bindparam("raw_json", type_=JSONB))
     with engine.begin() as conn:
         new_id = conn.execute(
             sql,
