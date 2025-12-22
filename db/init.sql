@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS tweets (
+  id BIGSERIAL PRIMARY KEY,
+  query TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TIMESTAMPTZ,
+  raw_json JSONB,
+  inserted_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
