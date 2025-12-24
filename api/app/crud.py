@@ -38,7 +38,7 @@ def insert_tweet(engine: Engine, *, query: str, text_content: str, created_at: A
             sql,
             {"query": query, "text": text_content, "created_at": created_at, "raw_json": raw_json},
         ).scalar_one()
-    return int(new_id)
+    return int(new_id) 
 
 """
 Retrieve the most recent tweets stored in the database. The tweets 
