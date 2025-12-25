@@ -78,3 +78,51 @@ def list_tweets(engine: Engine, *, query: str | None = None, limit: int = 50) ->
     with engine.connect() as conn:
         rows = conn.execute(text(sql), params).mappings().all()
     return [dict(r) for r in rows]
+
+def insert_sentiment(engine: Engine, *, tweet_id: int, model_name: str, label: str, score: float) -> int:
+    sql = text("""
+        INSERT INTO tweet_sentiment (tweet_id, model_name, label, score)
+        VALUES (:tweet_id, :model_name, :label, :score)
+        RETURNING id;
+    """)
+    with engine.begin() as conn:
+        new_id = conn.execute(sql, {
+            "tweet_id": tweet_id,
+            "model_name": model_name,
+            "label": label,
+            "score": score,
+        }).scalar_one()
+    return int(new_id)
+
+def list_tweets_with_latest_sentiment(engine: Engine, *, query: str | None = None, limit: int = 50) -> list[dict]:
+    base_sql = """
+    SELECT
+      t.id,
+      t.query,
+      t.text,
+      t.created_at,
+      t.inserted_at,
+      s.model_name,
+      s.label,
+      s.score,
+      s.predicted_at
+    FROM tweets t
+    LEFT JOIN LATERAL (
+      SELECT model_name, label, score, predicted_at
+      FROM tweet_sentiment
+      WHERE tweet_id = t.id
+      ORDER BY predicted_at DESC
+      LIMIT 1
+    ) s ON TRUE
+    """
+
+    params = {"limit": limit}
+    if query:
+        base_sql += " WHERE t.query = :query"
+        params["query"] = query
+
+    base_sql += " ORDER BY t.inserted_at DESC LIMIT :limit"
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(base_sql), params).mappings().all()
+    return [dict(r) for r in rows]
