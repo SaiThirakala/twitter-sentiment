@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query
 from app.db import db_ping, engine
-from app.crud import insert_tweet, list_tweets, insert_sentiment, list_tweets_with_latest_sentiment
+from app.crud import insert_tweet, insert_sentiment, list_tweets_with_latest_sentiment
 from app.ingest import fetch_mock_tweets
 from app.sentiment import predict_sentiment
 from sqlalchemy import text as sql_text
@@ -28,27 +28,29 @@ def ingest(query: str = Query(..., min_length=1), n: int = Query(10, ge=1, le=10
     return {"query": query, "requested": n, "inserted": len(inserted_ids), "ids": inserted_ids}
 
 @app.get("/tweets")
-def get_tweets(query: str | None = None, limit: int = 50):
+def get_tweets(query: str | None = None, limit: int = 50, model_name: str | None = None):
     limit = max(1, min(limit, 200))
-    items = list_tweets_with_latest_sentiment(engine, query=query, limit=limit)
+    items = list_tweets_with_latest_sentiment(engine, query=query, limit=limit, model_name=model_name)
     return {"count": len(items), "items": items}
 
 @app.post("/predict")
 def predict(text: str):
     return predict_sentiment(text)
 
-@app.post("/score_latest")
-def score_latest(query: str | None = None, limit: int = 50):
+@app.post("/score-latest")
+def score_latest(query: str | None = None, limit: int = 50) -> dict:
     limit = max(1, min(limit, 200))
+    model_name = "cardiffnlp/twitter-roberta-base-sentiment"
 
     # Get tweet IDs that match query and have no sentiment yet, optional
     sql = """
         SELECT t.id, t.text
         FROM tweets t
-        LEFT JOIN tweet_sentiment s ON s.tweet_id = t.id
+        LEFT JOIN tweet_sentiment s
+        ON s.tweet_id = t.id AND s.model_name = :model_name
         WHERE s.id IS NULL
     """
-    params = {"limit": limit}
+    params = {"limit": limit, "model_name": model_name}
     if query:
         sql += " AND t.query = :query"
         params["query"] = query

@@ -94,7 +94,20 @@ def insert_sentiment(engine: Engine, *, tweet_id: int, model_name: str, label: s
         }).scalar_one()
     return int(new_id)
 
-def list_tweets_with_latest_sentiment(engine: Engine, *, query: str | None = None, limit: int = 50) -> list[dict]:
+def list_tweets_with_latest_sentiment(
+    engine: Engine,
+    *,
+    query: str | None = None,
+    limit: int = 50,
+    model_name: str | None = None,
+) -> list[dict]:
+    """
+    Return tweets with the most recent sentiment prediction attached.
+
+    If model_name is provided, the "latest" sentiment is computed only among
+    predictions produced by that model. Otherwise, it uses the latest
+    prediction from any model.
+    """
     base_sql = """
     SELECT
       t.id,
@@ -111,12 +124,20 @@ def list_tweets_with_latest_sentiment(engine: Engine, *, query: str | None = Non
       SELECT model_name, label, score, predicted_at
       FROM tweet_sentiment
       WHERE tweet_id = t.id
+    """
+
+    params: dict = {"limit": limit}
+
+    if model_name:
+        base_sql += " AND model_name = :model_name"
+        params["model_name"] = model_name
+
+    base_sql += """
       ORDER BY predicted_at DESC
       LIMIT 1
     ) s ON TRUE
     """
 
-    params = {"limit": limit}
     if query:
         base_sql += " WHERE t.query = :query"
         params["query"] = query
@@ -125,4 +146,5 @@ def list_tweets_with_latest_sentiment(engine: Engine, *, query: str | None = Non
 
     with engine.connect() as conn:
         rows = conn.execute(text(base_sql), params).mappings().all()
+
     return [dict(r) for r in rows]
