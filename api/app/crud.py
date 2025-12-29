@@ -5,29 +5,30 @@ from sqlalchemy import text, bindparam
 from sqlalchemy.engine import Engine
 from sqlalchemy.dialects.postgresql import JSONB
 
-"""
-Insert a single tweet into the database and return its generated ID.
 
-Parameters
-engine : sqlalchemy.engine.Engine
-    SQLAlchemy engine used to connect to teh Postgres database.
-query : str
-    The topic associated with the tweet.
-text_content : str
-    The raw text content of the tweet.
-created_at : Any | None, optional
-    Timestamp indicated when the tweet was orignally created. 
-    This value can be None if the source does not provide any timestamp.
-    The database accepts timezone-aware timestamps.
-raw_json : dict | None, optional
-    Optional raw JSON payload from the datasource. Stored for some potential 
-    future use.
-    
-Returns
-int
-    The primary key ID of the newly inserted tweet.
-"""
 def insert_tweet(engine: Engine, *, query: str, text_content: str, created_at: Any | None = None, raw_json: dict | None = None) -> int:
+    """
+    Insert a single tweet into the database and return its generated ID.
+
+    Parameters
+    engine : sqlalchemy.engine.Engine
+        SQLAlchemy engine used to connect to teh Postgres database.
+    query : str
+        The topic associated with the tweet.
+    text_content : str
+        The raw text content of the tweet.
+    created_at : Any | None, optional
+        Timestamp indicated when the tweet was orignally created. 
+        This value can be None if the source does not provide any timestamp.
+        The database accepts timezone-aware timestamps.
+    raw_json : dict | None, optional
+        Optional raw JSON payload from the datasource. Stored for some potential 
+        future use.
+        
+    Returns
+    int
+        The primary key ID of the newly inserted tweet.
+    """
     sql = text("""
         INSERT INTO tweets (query, text, created_at, raw_json)
         VALUES (:query, :text, :created_at, :raw_json)
@@ -40,30 +41,30 @@ def insert_tweet(engine: Engine, *, query: str, text_content: str, created_at: A
         ).scalar_one()
     return int(new_id) 
 
-"""
-Retrieve the most recent tweets stored in the database. The tweets 
-recieved can be optionally filtered by a query.
-
-Parameters
-engine : sqlalchemy.engine.Engine
-    SQLAlchemy engine used to connect to the Postgres database.
-query : str | None, optional
-    Optional, used to filter the tweets so that only tweets
-    inserted with this query value will be returned.
-limit : int, default=50
-    Maximum number of tweets to return.
-
-Returns 
-    list[dict]
-        A list of dictionaries, where each dictionary represents a tweet
-        row with the following keys:
-        - id
-        - query
-        - text
-        - created_at
-        - inserted_at
-"""
 def list_tweets(engine: Engine, *, query: str | None = None, limit: int = 50) -> list[dict]:
+    """
+    Retrieve the most recent tweets stored in the database. The tweets 
+    recieved can be optionally filtered by a query.
+
+    Parameters
+    engine : sqlalchemy.engine.Engine
+        SQLAlchemy engine used to connect to the Postgres database.
+    query : str | None, optional
+        Optional, used to filter the tweets so that only tweets
+        inserted with this query value will be returned.
+    limit : int, default=50
+        Maximum number of tweets to return.
+
+    Returns 
+        list[dict]
+            A list of dictionaries, where each dictionary represents a tweet
+            row with the following keys:
+            - id
+            - query
+            - text
+            - created_at
+            - inserted_at
+    """
     sql = """
         SELECT id, query, text, created_at, inserted_at
         FROM tweets
@@ -80,6 +81,31 @@ def list_tweets(engine: Engine, *, query: str | None = None, limit: int = 50) ->
     return [dict(r) for r in rows]
 
 def insert_sentiment(engine: Engine, *, tweet_id: int, model_name: str, label: str, score: float) -> int:
+    """
+    Insert a sentinment prediction for a tweet into the database.
+
+    This function persists the output of a sentinment model for a given tweet to the 
+    Postrgres database. Each prediction is stored in a separate row, so each tweet can be
+    scored several times, either by a different model or by the same model at a different
+    points in time. 
+
+    Parameters
+    engine : sqlalchemy.engine.Engine
+        SQLAlchemy engine used to connect to the Postgres database.
+    tweet_id : int
+        The ID of the tweet that the sentiment predction is being performed. The ID must reference
+        an existing tweet in the 'tweets' table in the Postgres database.
+    model_name : str
+        Identifier for the NLP classification model used to generate the sentinment prediction.
+    label : str
+        Predicted sentinment label (NEGATIVE, NEUTRAL, or POSITIVE).
+    score : float
+        Probability value associated with the predicted label.
+    
+    Returns
+    int :
+        The primary key ID of the newly inserted sentinment prediction.
+    """
     sql = text("""
         INSERT INTO tweet_sentiment (tweet_id, model_name, label, score)
         VALUES (:tweet_id, :model_name, :label, :score)
