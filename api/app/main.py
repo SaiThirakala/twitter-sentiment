@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Query
 from app.db import db_ping, engine
-from app.crud import insert_tweet, insert_sentiment, list_tweets_with_latest_sentiment
+from app.crud import insert_tweet, insert_sentiment, list_tweets_with_latest_sentiment, get_sentiment_stats
 from app.ingest import fetch_mock_tweets
 from app.sentiment import predict_sentiment
 from sqlalchemy import text as sql_text
@@ -72,3 +72,7 @@ def score_latest(query: str | None = None, limit: int = 50) -> dict:
         inserted += 1
 
     return {"scored": inserted}
+
+@app.get("/stats")
+def stats(query: str | None = None, model_name: str = Query(...)):
+    return get_sentiment_stats(engine, query=query, model_name=model_name)

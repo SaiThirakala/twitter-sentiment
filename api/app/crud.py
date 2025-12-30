@@ -195,3 +195,59 @@ def list_tweets_with_latest_sentiment(
         rows = conn.execute(text(base_sql), params).mappings().all()
 
     return [dict(r) for r in rows]
+
+def get_sentiment_stats(
+    engine: Engine,
+    *,
+    query: str | None = None,
+    model_name: str,
+) -> dict :
+    """
+    Compute sentinment distribution and average confidence score.
+
+    Returns counts of POSITIVE, NEUTRAL, and NEGATIVE predictions and the average
+    confidence score of a given model, optionally filtered by query.
+    """
+    sql = """
+        SELECT
+            label,
+            COUNT(*) AS count,
+            AVG(score) AS avg_score
+        FROM tweet_sentiment s
+        JOIN tweets t ON t.id = s.tweet_id
+        WHERE s.model_name = :model_name
+    """
+
+    params = {"model_name": model_name}
+
+    if query:
+        sql += " AND t.query = :query"
+        params["query"] = query
+    
+    sql += " GROUP BY label"
+
+    with engine.connect() as conn:
+        rows = conn.execute(text(sql), params).mappings().all()
+
+    result = {
+        "model_name": model_name,
+        "query": query,
+        "counts": {"POSITIVE": 0, "NEUTRAL": 0, "NEGATIVE": 0},
+        "avg_score": None,
+    }
+
+    total_weighted_score = 0.0
+    total_count = 0
+
+    for r in rows:
+        label = r["label"]
+        count = r["count"]
+        avg = float(r["avg_score"])
+        result["counts"][label] = count
+        total_weighted_score += avg * count
+        total_count += count
+
+    if total_count > 0:
+        result["avg_score"] = total_weighted_score / total_count
+
+    return result
